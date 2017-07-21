@@ -8,6 +8,7 @@ var { Asset } = require(path.join(bitsharesPath, 'lib/common/MarketClasses'));
 var utils = require(path.join(bitsharesPath,'lib/common/utils')).default;
 var MarketsStore = require(path.join(bitsharesPath, "app/stores/MarketsStore")).default;
 var MarketsActions = require(path.join(bitsharesPath, "app/actions/MarketsActions")).default;
+var logger = require('./logger').default;
 
 class Balance {
 	constructor(account) {
@@ -233,7 +234,7 @@ class Balance {
 		// 	}
 		// }
 
-		console.log("Asset values: " + JSON.stringify(assetValues));
+		logger.info("Asset values: " + JSON.stringify(assetValues));
 		this.formattedAsset(totalValue, toAsset);
 	}
 
@@ -247,7 +248,7 @@ class Balance {
 
 		let value =  amount / precision;
 
-		console.log("Total value: " + value.toFixed(decimals) + ' ' + asset.get("symbol"));
+		logger.info("Total value: " + value.toFixed(decimals) + ' ' + asset.get("symbol"));
 		
 	}
 

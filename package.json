@@ -16,6 +16,7 @@
     "counterpart": "^0.18.1",
     "fractional": "^1.0.0",
     "immutable": "^3.8.1",
+    "log4js": "^2.2.0",
     "numeral": "^2.0.6"
   },
   "devDependencies": {

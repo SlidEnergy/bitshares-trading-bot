@@ -7,8 +7,16 @@
 		{
 			"type": "node",
 			"request": "launch",
-			"name": "Launch Program",
-			"program": "${workspaceRoot}\\index.js"
+			"name": "Debug",
+			"program": "${workspaceRoot}\\index.js",
+			"args": ["-debug"]
+		},
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "Trade",
+			"program": "${workspaceRoot}\\index.js",
+			"args": ["-debug", "-trade"]
 		}
 	]
 }

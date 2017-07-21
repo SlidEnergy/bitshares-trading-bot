@@ -1,6 +1,12 @@
-const { Apis } = require("bitsharesjs-ws"); 
+var { Apis } = require("bitsharesjs-ws"); 
 var { ChainStore } = require("bitsharesjs");
-const { Balance } = require("./balance"); 
+var { Balance } = require("./balance"); 
+var logger = require('./logger').default;
+
+let trade = process.argv.some(x=>x == '-trade')
+let debug = process.argv.some(x=>x == '-debug')
+
+logger.info("Параметры запуска: " + process.argv)
 
 var toAsset = "1.3.861"; // BTC
 var account = "slidtrader1";
@@ -31,7 +37,7 @@ function initBitshares() {
 		];
 
 		Apis.instance(WS_NODE_LIST[0].url, true).init_promise.then(res => {
-			console.log("connected to:", res[0].network); 
+			logger.info("connected to:", res[0].network); 
 
 			//ChainStore.subscribe(object => {}); 
 
