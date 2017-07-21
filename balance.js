@@ -17,6 +17,7 @@ class Balance {
 		this.account = account;
 		this.props = {};
 		this.coreAsset = "1.3.0";
+		this.marketStats = Immutable.Map();
 	}
 
 	async startShowTotal(toAsset) { 
@@ -132,10 +133,20 @@ class Balance {
 
 	onChange(state) {
 
-		this.TotalValue(this.props.fromAssets, this.props.toAsset, this.props.collateral, this.props.balances, this.props.debt, this.props.openOrders, state.allMarketStats);
+		this.marketStats = state.allMarketStats;
+		//this.showBalance();
 	}
 
-	async TotalValue(fromAssets, toAsset, collateral, balances, debt, openOrders, marketStats) {
+	showBalance() {
+
+		if(!this.marketStats.size) {
+			logger.info("Данные для рынка еще не получены");
+		}
+
+		this.showTotalValue(this.props.fromAssets, this.props.toAsset, this.props.collateral, this.props.balances, this.props.debt, this.props.openOrders, this.marketStats);
+	}
+
+	showTotalValue(fromAssets, toAsset, collateral, balances, debt, openOrders, marketStats) {
 
 		let coreAsset = ChainStore.getAsset("1.3.0"); 
 

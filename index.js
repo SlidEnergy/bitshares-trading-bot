@@ -1,6 +1,7 @@
 var { Apis } = require("bitsharesjs-ws"); 
 var { ChainStore } = require("bitsharesjs");
 var { Balance } = require("./balance"); 
+var { Bot } = require("./bot"); 
 var logger = require('./logger').default;
 
 let trade = process.argv.some(x=>x == '-trade')
@@ -10,10 +11,19 @@ logger.info("Параметры запуска: " + process.argv)
 
 var toAsset = "1.3.861"; // BTC
 var account = "slidtrader1";
+let asset = "OPEN.BTC";
+let currency = "USD";
+
+global.__DEV__ = false;
 	
 initBitshares().then(() => {
+	// Balance
 	let balance = new Balance(account);
 	balance.startShowTotal(toAsset);
+
+	// Bot
+	let bot = new Bot(account, asset, currency, balance);
+	bot.run();
 });
 
 function initBitshares() {
