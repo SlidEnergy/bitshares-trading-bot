@@ -1,0 +1,11 @@
+{
+    "presets": [
+        "./tools/es2015Preset"
+        // ,   "stage-0"  // для bitshares-ui
+    ]
+    // , "env": {
+    //     "cjs": {
+    //         "plugins": ["add-module-exports"]
+    //     }
+    // }
+}
