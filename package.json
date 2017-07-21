@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "babel bitshares-ui-web -d lib/bitshares-ui-web",
-    "example-build-es": "set BABEL_ENV=es && babel app -d dist --presets es2015 --source-maps"
+    "build-lib": "babel bitshares-ui-web -d lib/bitshares-ui-web",
+    "example-build-lib-es": "set BABEL_ENV=es && babel app -d dist --presets es2015 --source-maps"
   },
   "author": "",
   "license": "ISC",
