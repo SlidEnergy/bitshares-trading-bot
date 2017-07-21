@@ -58,4 +58,4 @@ typings/
 .env
 
 #my
-lib/bitshares-ui-web/
+/lib/bitshares-ui-web
