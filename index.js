@@ -7,7 +7,7 @@ var account = "slidtrader1";
 	
 initBitshares().then(() => {
 	let balance = new Balance(account);
-	balance.showTotal(toAsset);
+	balance.startShowTotal(toAsset);
 });
 
 function initBitshares() {

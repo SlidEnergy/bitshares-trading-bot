@@ -18,7 +18,7 @@ class Balance {
 		this.coreAsset = "1.3.0";
 	}
 
-	async showTotal(toAsset) { 
+	async startShowTotal(toAsset) { 
 
 		await FetchChain("getAccount", this.account); 
 		await FetchChain("getAsset", this.coreAsset);
@@ -191,20 +191,17 @@ class Balance {
 				}
 			}
 		});
-		console.log("Collateral value: " + collateral);
-		console.log("Total value: " + totalValue);
-		console.log("AssetValues: " + JSON.stringify(assetValues));
 
 		// Determine if higher precision should be displayed
-		let hiPrec = false;
-		for (let asset in assetValues) {
-			if (assets[asset] && assetValues[asset]) {
-				if (Math.abs(utils.get_asset_amount(assetValues[asset], toAsset)) < 100) {
-					hiPrec = true;
-					break;
-				}
-			}
-		}
+		// let hiPrec = false;
+		// for (let asset in assetValues) {
+		// 	if (assets[asset] && assetValues[asset]) {
+		// 		if (Math.abs(utils.get_asset_amount(assetValues[asset], toAsset)) < 100) {
+		// 			hiPrec = true;
+		// 			break;
+		// 		}
+		// 	}
+		// }
 
 		// Render each asset's balance, noting if there are any values missing
 		// const noDataSymbol = "**";
@@ -235,6 +232,23 @@ class Balance {
 		// 		totalsTip += `<tr><td>${symbol}:&nbsp;</td><td style="text-align: right;">${amount} ${toAsset.get("symbol")}</td></tr>`;
 		// 	}
 		// }
+
+		console.log("Asset values: " + JSON.stringify(assetValues));
+		this.formattedAsset(totalValue, toAsset);
+	}
+
+	formattedAsset(amount, asset) {
+		
+		let decimalOffset = asset.get("symbol").indexOf("BTC") === -1 ? asset.get("precision") : 4
+
+		let precision = utils.get_asset_precision(asset.get("precision"));
+		
+		let decimals = Math.max(0, asset.get("precision") - decimalOffset);
+
+		let value =  amount / precision;
+
+		console.log("Total value: " + value.toFixed(decimals) + ' ' + asset.get("symbol"));
+		
 	}
 
 	dispose() {
@@ -291,7 +305,7 @@ class Balance {
 					if (asset.get("id") !== coreAsset.get("id")) {
 						setTimeout(() => {
 							MarketsActions.getMarketStats(coreAsset, asset);
-							this.fromStatsIntervals[asset.get("id")] = setInterval(MarketsActions.getMarketStats.bind(this, coreAsset, asset), 1 * 60 * 1000);
+							this.fromStatsIntervals[asset.get("id")] = setInterval(MarketsActions.getMarketStats.bind(this, coreAsset, asset), 10 * 60 * 1000);
 						}, 50)
 					}
 				}
