@@ -1,15 +1,16 @@
 let logger = require('./logger').default;
 
 class AccountManager {
-	constructor(trader) {
+	constructor(trader, asset) {
 		this.trader = trader;
+		this.asset = asset;
 	}
 
 	async buy(amount, price) {
 
 		let portfollio = await this.getPortfollio();
 
-		if(!this.hasMoney(portfollio, this.trader.currency, amount * price)) {
+		if(!this._hasMoney(portfollio, this.trader.currency, amount * price)) {
 			logger.info("недостаточно денег");
 			return;
 		}
@@ -21,7 +22,7 @@ class AccountManager {
 		
 		let portfollio = await this.getPortfollio();
 
-		if(!this.hasMoney(portfollio, this.trader.asset, amount)) {
+		if(!this._hasMoney(portfollio, this.asset, amount)) {
 			logger.warn("недостаточно денег");
 			return;
 		}
@@ -60,12 +61,16 @@ class AccountManager {
 	_hasMoney(portfollio, asset, amount) {
 		let fee = 0.01213;
 
-		if(portfollio["BTS"] < fee) {
+		let  balance = portfollio.find(value => value.asset = "BTS");
+
+		if(!balance || balance.amount < fee) {
 			logger.info("На счете нет BTS для уплаты коммиссии.");
 			return false;
 		}
 
-		if(portfollio[asset] < amount) {
+		balance = portfollio.find(value => value.asset == asset)
+
+		if(!balance || balance.amount < amount) {
 			logger.info("На счете не хватает средств " + asset + " для размещения ордера.");
 			return false;
 		}

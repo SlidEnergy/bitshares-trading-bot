@@ -156,9 +156,24 @@ Trader.prototype.checkOrders = async function() {
 Trader.prototype.getPortfollio = async function() {
     try
     {
-		let history = await this._getHistory();
+        const account = ChainStore.getAccount(this.account);
+        const account_balances = account.get("balances"); 
+        //TODO fetch assets
 
-		return history[this.account].balance;
+		return account_balances.toArray().map( item => { 
+            let balance = ChainStore.getObject(item); 
+            let asset_id = balance.get("asset_type");
+            let asset = ChainStore.getAsset(asset_id);
+
+            return {
+                asset: asset.get("symbol"),
+                amount: utils.get_asset_amount(balance.get("balance"), asset)
+            }
+        }); 
+            
+		// let history = await this._getHistory();
+
+		// return history[this.account].balance;
     }
 	catch(err) {
 		catch_err(err);
