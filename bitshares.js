@@ -93,22 +93,16 @@ Trader.prototype.getOrders = async function() {
 		const base = ChainStore.getAsset(this.currency);
 
         return { 
-			asks: combinedAsks.map(ask => {
-				return { 
-					price: ask.getPrice(), 
-					amount: utils.format_number(ask.amountForSale().getAmount({real: true}), quote.get("precision")),
-					value: utils.format_number(ask.amountToReceive().getAmount({real: true}), base.get("precision")),
-					total: utils.format_number(ask.totalToReceive().getAmount({real: true}), base.get("precision"))
+			asks: combinedAsks.map(order => {
+                let {amount, value, price }  = market_utils.parseOrder(order, base, quote);
+				return {amount, value, price: price.full};
 				}
-			}),
-			bids: combinedBids.map(bid => {
-				return {
-					price: bid.getPrice(),
-					amount: utils.format_number(bid.amountToReceive().getAmount({real: true}), quote.get("precision")),
-					value: utils.format_number(bid.amountForSale().getAmount({real: true}), base.get("precision")),
-					total: utils.format_number(bid.totalForSale().getAmount({real: true}), base.get("precision"))
-				}
-			})};
+			),
+			bids: combinedBids.map(order => {
+                let { amount, value, price }  = market_utils.parseOrder(order, base, quote)
+                return { amount, value, price: price.full }
+            }
+		)};
 
 
         // let message = {
