@@ -6,7 +6,8 @@ let trade = process.argv.some(x=>x == '-trade')
 
 let schedule = require('node-schedule');
 
-
+// BID - ордер на покупку
+// ASK - ордер на продажу
 
 class Bot {
 	constructor(account, asset, currency, balance) {
@@ -15,7 +16,7 @@ class Bot {
 		this.currency = currency;
 		this.balance = balance;
 
-		let trader = new Trader({ account, currency: "1.3.121", asset: "1.3.861", trade });
+		let trader = new Trader({ account, currency, asset, trade });
 		this.accountManager = new AccountManager(trader, asset, currency);
 	}
 
@@ -26,7 +27,7 @@ class Bot {
 	}
 
 	async loop() {
-		logger.info("=========================== Заупуск цикла =========================================");
+		logger.info(`=========================== Заупуск цикла ${this.asset}_${this.currency} ================================`);
 
 		let orderVolume = 0.001;
 
@@ -107,7 +108,7 @@ class Bot {
 	}
 
 	finishRun() {
-		logger.info("=========================== Конец цикла =========================================");
+		logger.info("================================ Конец цикла =====================================");
 	}
 
 	

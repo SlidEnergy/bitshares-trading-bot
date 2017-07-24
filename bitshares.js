@@ -15,30 +15,39 @@ const co = require('co');
 let api_lib = require('openledger_nodejs_api/libs');
 require('./bitshares-cfg.js')(api_lib); // patching to pass private keys and wssapi address
 
+const assetsInfo = { "USD": "1.3.121", "BTC": "1.3.861", "BTS": "1.3.0", "CNY": "1.3.113" };
+
 var Trader = function(config) {
     _.bindAll(this);
     if(_.isObject(config)) {
-        this.account = config.account
-        this.currency = config.currency;
-        this.asset = config.asset;
         this.trade = config.trade;
+
+        this.account_name = config.account
+        this.currency = config.currency;
+
+        this.baseAsset_id = assetsInfo[config.asset];
+        this.quoteAsset_id = assetsInfo[config.currency];
     }
     this.name = 'Bitshares';
     this.balance;
     this.price;
+    this.initialized = false;
 
-    this.pair = [this.currency, this.asset].join('_');
-
-    FetchChain("getAsset", this.asset),
-          
     Promise.all([
-        FetchChain("getAsset", this.currency),
-        FetchChain("getAccount", this.account)
+        FetchChain("getAsset", this.baseAsset_id),
+        FetchChain("getAsset", this.quoteAsset_id),
+        FetchChain("getAccount", this.account_name)
 	]).then( res => {
-		let baseAsset = ChainStore.getAsset(this.asset);
-		let quoteAsset = ChainStore.getAsset(this.currency);
-		
-        _subToMarket(baseAsset, quoteAsset, 10);
+		this.baseAsset = ChainStore.getAsset(this.baseAsset_id);
+        this.quoteAsset = ChainStore.getAsset(this.quoteAsset_id);
+        this.account = ChainStore.getAccount(this.account_name);
+        
+        if(!this.baseAsset || !this.quoteAsset || !this.account)
+            throw Error("Не удалось инициировать класс.");
+
+        this._subToMarket();
+
+        this.initialized = true;
     
         // let bid = {
         //     forSaleText: "",
@@ -78,22 +87,27 @@ Trader.prototype.buy = async function(amount, price) {
 
     try
 	{
+        if(!this.initialized) {
+            console.log("Работа с биржей еще не иницилизирована.");
+            return;
+        }
+
         // this._onInputReceive("bid", true, amount);
         // this._onInputPrice("bid", price);
         // this._createLimitOrder("buy", "1.3.0");
 
-        let baseAsset = ChainStore.getAsset(this.asset);
-        let quoteAsset = ChainStore.getAsset(this.currency);
-        
+        let base_satoshi_amount = utils.get_satoshi_amount(amount, this.baseAsset);
+        let quote_satoshi_amount = utils.get_satoshi_amount(amount * price, this.quoteAsset);
+      
         var message = {
-            from: this.account,
+            from: this.account_name,
             amount_to_sell: {
-                "amount": Math.floor(amount * price * Math.pow(10, quoteAsset.get("precision"))),
-                "asset_id": this.currency
+                "amount": quote_satoshi_amount,
+                "asset_id": this.quoteAsset_id
             },
             "min_to_receive": {
-                "amount": Math.floor(amount * Math.pow(10, baseAsset.get("precision"))),
-                "asset_id": this.asset
+                "amount": base_satoshi_amount,
+                "asset_id": this.baseAsset_id
             },
             debug: !this.trade, // 'transction not real if debug equal true'
             type: "limit_order_create"
@@ -115,20 +129,28 @@ Trader.prototype.sell = async function(amount, price) {
 
     try
 	{
+        if(!this.initialized) {
+            console.log("Работа с биржей еще не иницилизирована.");
+            return;
+        }
+
         // this._onInputSell("ask", false, amount);
         // this._onInputPrice("ask", price);
 
         // this._createLimitOrder("sell", "1.3.0");
 
+        let base_satoshi_amount = utils.get_satoshi_amount(amount, this.baseAsset);
+        let quote_satoshi_amount = utils.get_satoshi_amount(amount * price, this.quoteAsset);
+
         var message = {
-            from: this.account,
+            from: this.account_name,
             amount_to_sell: {
-                "amount": Math.floor(amount * Math.pow(10, markets[this.asset].precision)), 
-                "asset_id": this.asset 
+                "amount": base_satoshi_amount, 
+                "asset_id": this.baseAsset_id
             },
             "min_to_receive": {
-                "amount": Math.floor(amount * price * Math.pow(10, markets[this.currency].precision)), 
-                "asset_id": this.currency 
+                "amount": quote_satoshi_amount, 
+                "asset_id": this.quoteAsset_id
             },
             debug: !this.trade, // 'transction not real if debug equal true'
             type: "limit_order_create" // 'do not change this key'
@@ -148,8 +170,14 @@ Trader.prototype.sell = async function(amount, price) {
 
 Trader.prototype.cancelOrder = async function(order) {
     try
-	{   message = {
-            from: this.account,
+	{  
+        if(!this.initialized) {
+            console.log("Работа с биржей еще не иницилизирована.");
+            return;
+        }
+
+        message = {
+            from: this.account_name,
             order_id: order.id,
             type: "limit_order_cancel"
         };
@@ -169,14 +197,20 @@ Trader.prototype.cancelOrder = async function(order) {
 Trader.prototype.getOrders = async function() {
     try
 	{
-        let {combinedBids, combinedAsks} = MarketsStore.getState().marketData;
+        if(!this.initialized) {
+            console.log("Работа с биржей еще не иницилизирована.");
+            return;
+        }
 
-		const quote = ChainStore.getAsset(this.asset);
-		const base = ChainStore.getAsset(this.currency);
+        // Inverted terms for bitshares-ui
+        let baseAsset = ChainStore.getAsset(this.quoteAsset_id);
+        let quoteAsset = ChainStore.getAsset(this.baseAsset_id);
+        
+        let {combinedBids, combinedAsks} = MarketsStore.getState().marketData;
 
         return { 
 			asks: combinedAsks.map(order => {
-                let {amount, value, price }  = market_utils.parseOrder(order, base, quote);
+                let {amount, value, price }  = market_utils.parseOrder(order, baseAsset, quoteAsset);
                 return { 
                     id: order.id,
                     amount, 
@@ -186,7 +220,7 @@ Trader.prototype.getOrders = async function() {
                 };
 			}),
 			bids: combinedBids.map(order => {
-                let { amount, value, price }  = market_utils.parseOrder(order, base, quote)
+                let { amount, value, price }  = market_utils.parseOrder(order, baseAsset, quoteAsset)
                 return { 
                     id: order.id,
                     amount, 
@@ -217,11 +251,16 @@ Trader.prototype.getOrders = async function() {
 	}
 }
 
-Trader.prototype.checkOrders = async function() {
+Trader.prototype.checkOrders = async function(order) {
     try
 	{
+        if(!this.initialized) {
+            console.log("Работа с биржей еще не иницилизирована.");
+            return;
+        }
+
         let message = {
-            orders: [ markets[this.asset].asset_id, markets[this.currency].asset_id ],
+            orders: [ order.id ],
             type: "check_orders"
         };
 
@@ -242,8 +281,12 @@ Trader.prototype.checkOrders = async function() {
 Trader.prototype.getPortfollio = async function() {
     try
     {
-        const account = ChainStore.getAccount(this.account);
-        const account_balances = account.get("balances"); 
+        if(!this.initialized) {
+            console.log("Работа с биржей еще не иницилизирована.");
+            return;
+        }
+
+        const account_balances = this.account.get("balances"); 
         //TODO fetch assets
 
 		return account_balances.toArray().map( item => { 
@@ -269,22 +312,28 @@ Trader.prototype.getPortfollio = async function() {
 Trader.prototype.getOpenedOrders = async function() {
     try
     {
-        let orders = MarketsStore.getState().marketLimitOrders;
+        if(!this.initialized) {
+            console.log("Работа с биржей еще не иницилизирована.");
+            return;
+        }
 
-        const quote = ChainStore.getAsset(this.asset);
-        const base = ChainStore.getAsset(this.currency);
-        let account_id = ChainStore.getAccount(this.account).get("id");
+        // Inverted terms for bitshares-ui
+        let baseAsset = ChainStore.getAsset(this.quoteAsset_id);
+        let quoteAsset = ChainStore.getAsset(this.baseAsset_id);
+
+        let orders = MarketsStore.getState().marketLimitOrders;
+        let account_id = this.account.get("id");
 
         return {
             bids: orders.filter(a => {
-                return (a.seller === account_id && a.sell_price.quote.asset_id !== base.get("id"));
+                return (a.seller === account_id && a.sell_price.quote.asset_id === quoteAsset.get("id"));
             }).sort((a, b) => {
-                let {price: a_price} = market_utils.parseOrder(a, base, quote);
-                let {price: b_price} = market_utils.parseOrder(b, base, quote);
+                let {price: a_price} = market_utils.parseOrder(a, baseAsset, quoteAsset);
+                let {price: b_price} = market_utils.parseOrder(b, baseAsset, quoteAsset);
 
                 return b_price.full - a_price.full;
             }).map(order => {
-                let { value, price, amount } = market_utils.parseOrder(order, base, quote);
+                let { value, price, amount } = market_utils.parseOrder(order, baseAsset, quoteAsset);
 
                 return {
                     id: order.id,
@@ -296,14 +345,14 @@ Trader.prototype.getOpenedOrders = async function() {
             }).toArray(),
 
             asks: orders.filter(a => {
-                return (a.seller === account_id && a.sell_price.quote.asset_id === base.get("id"));
+                return (a.seller === account_id && a.sell_price.quote.asset_id === baseAsset.get("id"));
             }).sort((a, b) => {
-                let {price: a_price} = market_utils.parseOrder(a, base, quote);
-                let {price: b_price} = market_utils.parseOrder(b, base, quote);
+                let {price: a_price} = market_utils.parseOrder(a, baseAsset, quoteAsset);
+                let {price: b_price} = market_utils.parseOrder(b, baseAsset, quoteAsset);
 
                 return a_price.full - b_price.full;
             }).map(order => {
-                let { value, price, amount } = market_utils.parseOrder(order, base, quote);
+                let { value, price, amount } = market_utils.parseOrder(order, baseAsset, quoteAsset);
                 
                 return {
                     id: order.id,
@@ -452,7 +501,15 @@ Trader.prototype.getOpenedOrders = async function() {
 // 	}
 // }
 
-function _subToMarket(quoteAsset, baseAsset, bucketSize) {
+//function _subToMarket(quoteAsset, baseAsset, bucketSize) {
+Trader.prototype._subToMarket = function() {
+
+    
+    // Inverted terms for bitshares-ui
+    let baseAsset = ChainStore.getAsset(this.quoteAsset_id);
+    let quoteAsset = ChainStore.getAsset(this.baseAsset_id);
+
+    const bucketSize = 10;
 
     if (quoteAsset.get("id") && baseAsset.get("id")) {
         MarketsActions.subscribeMarket.defer(baseAsset, quoteAsset, bucketSize);

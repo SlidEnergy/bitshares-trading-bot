@@ -11,8 +11,6 @@ logger.info("Параметры запуска: " + process.argv)
 
 var toAsset = "1.3.861"; // BTC
 var account = "slidtrader1";
-let asset = "OPEN.BTC";
-let currency = "USD";
 
 global.__DEV__ = false;
 	
@@ -22,8 +20,11 @@ initBitshares().then(() => {
 	balance.startShowTotal(toAsset);
 
 	// Bot
-	let bot = new Bot(account, asset, currency, balance);
-	bot.run();
+	let btc_usd_bot = new Bot(account, "BTC", "USD", balance);
+	btc_usd_bot.run();
+
+	// let bts_cny_bot = new Bot(account, "BTS", "CNY", balance);
+	// bts_cny_bot.run();
 });
 
 function initBitshares() {
