@@ -37,8 +37,15 @@ class Bot {
 			this.finishRun();
 			return;
 		}
+
+		let openedOrders = await this.accountManager.getOpenedOrders();
+
+		if(!openedOrders || !openedOrders.asks || !openedOrders.bids) {
+			logger.error("Не удалось получить открытые ордера");
+			return;
+		}
 		
-		let { bestAsk, bestBid } = this.getTheBestAskAndBid(orders, orderVolume);
+		let { bestAsk, bestBid } = this.getTheBestAskAndBid(orders, orderVolume, openedOrders);
 
 		if(!bestAsk || !bestBid) {
 			logger.warn("bestAsk и bestBid не определен.");
@@ -51,13 +58,24 @@ class Bot {
 			finishRun();
 			return;
 		}
-		
-		let openedOrders = await this.accountManager.getOpenedOrders();
 
-		if(!openedOrders || !openedOrders.asks || !openedOrders.bids) {
-			logger.error("Не удалось получить открытые ордера");
-			return;
-		}
+		//let fee = 0.0023; //USD
+		//let fee = 0.01213; //BTS
+		let fee = 0.00000021; //BTC
+
+		let oldExpirationDate = new Date();
+		oldExpirationDate.setFullYear((oldExpirationDate.getFullYear() + 5));
+		oldExpirationDate.setHours((oldExpirationDate.getHours() - 1));
+
+		// Проверяем ордеры на актуальность
+		for(var i = 0; i < openedOrders.bids.length; i++) {
+			let order = openedOrders.bids[i];
+
+			if(order.price + fee < bestBid && order.expiration < oldExpirationDate) {
+				logger.info(`Отменяем ордер на покупку. Цена ${order.price}, лучшая расчитанная цена ${bestBid}. Дата истечения ордера ${oldExpirationDate.toISOString()}`);
+				await this.accountManager.cancelOrder(order);
+			}
+		};
 
 		if(openedOrders.bids.length == 0) {
 			logger.info("Покупаем");
@@ -65,6 +83,16 @@ class Bot {
 		}
 		else
 			logger.info("Мы уже имеем открытую позицию на покупку.");
+
+		// Проверяем ордеры на актуальность
+		for(var i = 0; i < openedOrders.asks.length; i++) {
+			let order = openedOrders.asks[i];
+
+			if(order.price - fee > bestBid && order.expiration < oldExpirationDate) {
+				logger.info(`Отменяем ордер на продажу. Цена ${order.price}, лучшая расчитанная цена ${bestAsk}. Дата истечения ордера ${oldExpirationDate.toISOString()}`);
+				await this.accountManager.cancelOrder(order);
+			}
+		};
 
 		if(openedOrders.asks.length == 0) {
 			logger.info("Продаем");	
@@ -85,9 +113,9 @@ class Bot {
 	
 	isProfitable(bestAsk, bestBid) {
 		
-		//let fee = 0.0018; //USD
+		//let fee = 0.0023; //USD
 		//let fee = 0.01213; //BTS
-		let fee = 0.0000002; //BTC
+		let fee = 0.00000021; //BTC
 
 		let avgPrice = (bestAsk + bestBid) / 2;
 
@@ -99,7 +127,7 @@ class Bot {
 			return false;
 	}
 
-	getTheBestAskAndBid(orders, orderVolume) {
+	getTheBestAskAndBid(orders, orderVolume, openedOrders) {
 
 		let smallVolume = orderVolume * 0.1; // 10% от объема
 
@@ -109,7 +137,8 @@ class Bot {
 		let total = 0;
 
 		let bestAsk = orders.asks.find(ask => {
-			total += ask.amount;
+			if(!openedOrders.asks.find(openedOrder => openedOrder.id == ask.id))
+				total += ask.amount;
 
 			return total > smallVolume;
 		});
@@ -117,7 +146,8 @@ class Bot {
 		total = 0;
 
 		let bestBid = orders.bids.find(bid => {
-			total += bid.amount;
+			if(!openedOrders.bids.find(openedOrder => openedOrder.id == bid.id))
+				total += bid.amount;
 
 			return total > smallVolume;
 		});

@@ -31,6 +31,10 @@ class AccountManager {
 		await this.trader.sell(amount, price);
 	}
 	
+	async cancelOrder(order) {
+		await this.trader.cancelOrder(order);
+	}
+
 	async getOrders() {
 		logger.info("Получаем все ордера");
 		return await this.trader.getOrders();

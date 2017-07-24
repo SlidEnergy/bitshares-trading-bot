@@ -13,12 +13,14 @@
   "dependencies": {
     "alt": "^0.18.6",
     "bitsharesjs": "^1.2.4",
+    "co": "^4.6.0",
     "counterpart": "^0.18.1",
     "fractional": "^1.0.0",
     "immutable": "^3.8.1",
     "log4js": "^2.2.0",
     "node-schedule": "^1.2.3",
-    "numeral": "^2.0.6"
+    "numeral": "^2.0.6",
+    "openledger_nodejs_api": "git+https://github.com/slidenergy/openledger_nodejs_api.git"
   },
   "devDependencies": {
     "babel-cli": "^6.24.1",
