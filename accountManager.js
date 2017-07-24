@@ -1,17 +1,18 @@
 let logger = require('./logger').default;
 
 class AccountManager {
-	constructor(trader, asset) {
+	constructor(trader, asset, currency) {
 		this.trader = trader;
 		this.asset = asset;
+		this.currency = currency;
 	}
 
 	async buy(amount, price) {
 
 		let portfollio = await this.getPortfollio();
 
-		if(!this._hasMoney(portfollio, this.trader.currency, amount * price)) {
-			logger.info("недостаточно денег");
+		if(!this._hasMoney(portfollio, this.currency, amount * price)) {
+			logger.warn("недостаточно денег");
 			return;
 		}
 

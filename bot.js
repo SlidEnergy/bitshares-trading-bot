@@ -16,7 +16,7 @@ class Bot {
 		this.balance = balance;
 
 		let trader = new Trader({ account, currency: "1.3.121", asset: "1.3.861", trade });
-		this.accountManager = new AccountManager(trader, asset);
+		this.accountManager = new AccountManager(trader, asset, currency);
 	}
 
 	run() {
