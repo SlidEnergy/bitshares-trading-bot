@@ -84,12 +84,12 @@ class Bot {
 		};
 
 		if(openedOrders.bids.length == 0) {
-			if(this.checkMaxAssetAmount(this.asset, this.amount, portfollio)) {
+			if(this.checkMaxAssetAmount(this.asset, this.amount, portfollio, this.maxAssetAmount)) {
 				logger.info(`Покупаем. Количество ${this.amount} цена ${bestBid}`);
 				await this.accountManager.buy(this.amount, bestBid);	
 			}
 			else
-				logger.info(`Мы уже достигли максимального объема по ${this.asset}`);
+				logger.warn(`Мы уже достигли максимального объема ${this.maxAssetAmount} ${this.asset}`);
 		}
 		else
 			logger.info("Мы уже имеем открытую позицию на покупку.");
@@ -105,12 +105,12 @@ class Bot {
 		};
 
 		if(openedOrders.asks.length == 0) {
-			if(this.checkMaxAssetAmount(this.currency, this.amount * bestAsk, portfollio)) {
+			if(this.checkMaxAssetAmount(this.currency, this.amount * bestAsk, portfollio, this.maxCurrencyAmount)) {
 				logger.info(`Продаем. Количество ${this.amount} цена ${bestAsk}`);	
 				await this.accountManager.sell(this.amount, bestAsk);
 			}
 			else
-				logger.info(`Мы уже достигли максимального объема по ${this.currency}`);
+				logger.warn(`Мы уже достигли максимального объема ${this.maxCurrencyAmount} ${this.currency}`);
 		}
 		else
 			logger.info("Мы уже имеем открытую позицию на продажу.");
@@ -125,9 +125,9 @@ class Bot {
 		setTimeout(this.loop.bind(this), 60*1000);
 	}
 
-	checkMaxAssetAmount(asset, amount, portfollio) {
+	checkMaxAssetAmount(asset, amount, portfollio, maxAmount) {
 		let balance = portfollio.find(x=> x.asset == this.asset);
-		if(balance.amount + amount > this.maxAssetAmount)
+		if(balance.amount + amount > maxAmount)
 			return false;
 		
 		return true;

@@ -26,7 +26,12 @@ initBitshares().then(() => {
 	setTimeout(() => {
 		let bts_cny_bot = new Bot(balance, account, "BTS", 40, "CNY", 40);
 		bts_cny_bot.run();
-	}, 30 * 1000);
+	}, 20 * 1000);
+
+	setTimeout(() => {
+		let btc_bts_bot = new Bot(balance, account, "BTC", 0.01, "BTS", 40);
+		btc_bts_bot.run();
+	}, 40 * 1000);
 });
 
 function initBitshares() {
