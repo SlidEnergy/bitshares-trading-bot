@@ -351,7 +351,7 @@ Trader.prototype.getPortfollio = async function() {
             let asset = ChainStore.getAsset(asset_id);
 
             return {
-                asset: asset.get("symbol"),
+                asset: asset.get("symbol") == "OPEN.BTC" ? "BTC" : asset.get("symbol"),
                 amount: utils.get_asset_amount(balance.get("balance"), asset)
             }
         }); 
