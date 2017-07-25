@@ -10,7 +10,8 @@ let schedule = require('node-schedule');
 // ASK - ордер на продажу
 
 class Bot {
-	constructor(account, asset, currency, balance) {
+	constructor(account, amount, asset, currency, balance) {
+		this.amount = amount;
 		this.account = account;
 		this.asset = asset;
 		this.currency = currency;
@@ -21,19 +22,19 @@ class Bot {
 	}
 
 	run() {
-		schedule.scheduleJob("*/1 * * * *", this.loop.bind(this));
-		logger.info("Запуск первого цикла через 10 сек. Запуск последующих циклов через каждую 1 минуту")
+		//schedule.scheduleJob("*/1 * * * *", this.loop.bind(this));
+		// Даем время 10 сек. на инициализацию классов и получения первоначальных данных с бирж.
+		 // ставим запуск следующего цикла минимум через 2 минуты, т.к. повторный цикл может запуститься раньше чем закончится предыдущий.
+		logger.info("Запуск первого цикла через 10 сек. Запуск последующих циклов через каждые 2 минуты");
 		setTimeout(this.loop.bind(this), 10000);
 	}
 
 	async loop() {
 		logger.info(`=========================== Заупуск цикла ${this.asset}_${this.currency} ================================`);
 
-		let orderVolume = 0.001;
-
 		let orders = await this.accountManager.getOrders();
 
-		if(orders.asks.length < 10 || orders.bids.length < 10) {
+		if(!orders || orders.asks.length < 10 || orders.bids.length < 10) {
 			logger.warn("Ордеров мало для дальнейшей торговли. Возможно недостаточный объем или данные о рынке еще не получены.");
 			this.finishRun();
 			return;
@@ -46,7 +47,7 @@ class Bot {
 			return;
 		}
 		
-		let { bestAsk, bestBid } = this.getTheBestAskAndBid(orders, orderVolume, openedOrders);
+		let { bestAsk, bestBid } = this.getTheBestAskAndBid(orders, this.amount, openedOrders);
 
 		if(!bestAsk || !bestBid) {
 			logger.warn("bestAsk и bestBid не определен.");
@@ -55,7 +56,7 @@ class Bot {
 		}
 
 		if(!this.isProfitable(bestAsk, bestBid)) {
-			logger.info("Вычисленные bestAsk и bestBid не принесут прибыль.");
+			logger.info(`Вычисленные bestAsk ${bestAsk} и bestBid ${bestBid} не принесут прибыль.`);
 			finishRun();
 			return;
 		}
@@ -79,8 +80,8 @@ class Bot {
 		};
 
 		if(openedOrders.bids.length == 0) {
-			logger.info("Покупаем");
-			await this.accountManager.buy(orderVolume, bestBid);	
+			logger.info(`Покупаем. Количество ${this.amount} цена ${bestBid}`);
+			await this.accountManager.buy(this.amount, bestBid);	
 		}
 		else
 			logger.info("Мы уже имеем открытую позицию на покупку.");
@@ -96,8 +97,8 @@ class Bot {
 		};
 
 		if(openedOrders.asks.length == 0) {
-			logger.info("Продаем");	
-			await this.accountManager.sell(orderVolume, bestAsk);
+			logger.info(`Продаем. Количество ${this.amount} цена ${bestAsk}`);	
+			await this.accountManager.sell(this.amount, bestAsk);
 		}
 		else
 			logger.info("Мы уже имеем открытую позицию на продажу.");
@@ -109,6 +110,7 @@ class Bot {
 
 	finishRun() {
 		logger.info("================================ Конец цикла =====================================");
+		setTimeout(this.loop.bind(this), 60*1000);
 	}
 
 	

@@ -9,11 +9,14 @@ var MarketsStore = require(path.join(bitsharesPath, "app/stores/MarketsStore")).
 var MarketsActions = require(path.join(bitsharesPath, "app/actions/MarketsActions")).default;
 var utils = require(path.join(bitsharesPath,'lib/common/utils')).default;
 var market_utils = require(path.join(bitsharesPath, "lib/common/market_utils")).default;
-//var { Asset, Price } = require(path.join(bitsharesPath, 'lib/common/MarketClasses'));
+
+var { LimitOrder } = require(path.join(bitsharesPath, "lib/common/MarketClasses"));
 
 const co = require('co');
 let api_lib = require('openledger_nodejs_api/libs');
 require('./bitshares-cfg.js')(api_lib); // patching to pass private keys and wssapi address
+
+let {Apis} = require("bitsharesjs-ws");
 
 const assetsInfo = { "USD": "1.3.121", "BTC": "1.3.861", "BTS": "1.3.0", "CNY": "1.3.113" };
 
@@ -206,30 +209,83 @@ Trader.prototype.getOrders = async function() {
         let baseAsset = ChainStore.getAsset(this.quoteAsset_id);
         let quoteAsset = ChainStore.getAsset(this.baseAsset_id);
         
-        let {combinedBids, combinedAsks} = MarketsStore.getState().marketData;
-
-        return { 
-			asks: combinedAsks.map(order => {
-                let {amount, value, price }  = market_utils.parseOrder(order, baseAsset, quoteAsset);
-                return { 
-                    id: order.id,
-                    amount, 
-                    value, 
-                    price: price.full, 
-                    expiration: new Date(order.expiration.getTime() - order.expiration.getTimezoneOffset()*60*1000)
-                };
-			}),
-			bids: combinedBids.map(order => {
-                let { amount, value, price }  = market_utils.parseOrder(order, baseAsset, quoteAsset)
-                return { 
-                    id: order.id,
-                    amount, 
-                    value, 
-                    price: price.full, 
-                    expiration: new Date(order.expiration.getTime() - order.expiration.getTimezoneOffset()*60*1000)
-                };
-            })
+        const assets = {
+            [this.quoteAsset.get("id")]: {precision: this.quoteAsset.get("precision")},
+            [this.baseAsset.get("id")]: {precision: this.baseAsset.get("precision")}
         };
+
+        let limits = await Apis.instance().db_api().exec("get_limit_orders", [ baseAsset.get("id"), quoteAsset.get("id"), 200]);
+        
+        let orders = Immutable.Map();
+        limits.forEach(order => {
+            if (typeof order.for_sale !== "number") {
+                order.for_sale = parseInt(order.for_sale, 10);
+            }
+            
+            order.expiration = new Date(order.expiration);
+            order.expiration = new Date(order.expiration.getTime() - order.expiration.getTimezoneOffset()*60*1000);
+
+            orders = orders.set(
+                order.id,
+                new LimitOrder(order, assets, quoteAsset.get("id"))
+            );
+        });
+
+        return {
+            bids: orders.filter(a => {
+                    return a.isBid();
+                }).sort((a, b) => {
+                    return b.getPrice() - a.getPrice();
+                }).map(order => {
+                     let { amount, value, price }  = market_utils.parseOrder(order, baseAsset, quoteAsset)
+                    return { 
+                        id: order.id,
+                        amount, 
+                        value, 
+                        price: price.full, 
+                        expiration: order.expiration
+                    };
+                }).toArray(),
+            asks: orders.filter(a => {
+                    return !a.isBid();
+                }).sort((a, b) => {
+                    return a.getPrice() - b.getPrice();
+                }).map(order => {
+                    let {amount, value, price }  = market_utils.parseOrder(order, baseAsset, quoteAsset);
+                    return { 
+                        id: order.id,
+                        amount, 
+                        value, 
+                        price: price.full, 
+                        expiration: order.expiration
+                    };
+                }).toArray()
+        };
+
+        // let {combinedBids, combinedAsks} = MarketsStore.getState().marketData;
+
+        // return { 
+		// 	asks: combinedAsks.map(order => {
+        //         let {amount, value, price }  = market_utils.parseOrder(order, baseAsset, quoteAsset);
+        //         return { 
+        //             id: order.id,
+        //             amount, 
+        //             value, 
+        //             price: price.full, 
+        //             expiration: new Date(order.expiration.getTime() - order.expiration.getTimezoneOffset()*60*1000)
+        //         };
+		// 	}),
+		// 	bids: combinedBids.map(order => {
+        //         let { amount, value, price }  = market_utils.parseOrder(order, baseAsset, quoteAsset)
+        //         return { 
+        //             id: order.id,
+        //             amount, 
+        //             value, 
+        //             price: price.full, 
+        //             expiration: new Date(order.expiration.getTime() - order.expiration.getTimezoneOffset()*60*1000)
+        //         };
+        //     })
+        // };
 
         // let message = {
         //     base: markets[this.asset].asset_id,
@@ -321,48 +377,102 @@ Trader.prototype.getOpenedOrders = async function() {
         let baseAsset = ChainStore.getAsset(this.quoteAsset_id);
         let quoteAsset = ChainStore.getAsset(this.baseAsset_id);
 
-        let orders = MarketsStore.getState().marketLimitOrders;
+        const assets = {
+            [this.quoteAsset.get("id")]: {precision: this.quoteAsset.get("precision")},
+            [this.baseAsset.get("id")]: {precision: this.baseAsset.get("precision")}
+        };
+
+        let limits = await Apis.instance().db_api().exec("get_limit_orders", [ baseAsset.get("id"), quoteAsset.get("id"), 200]);
         let account_id = this.account.get("id");
+
+        let orders = Immutable.Map();
+        limits.forEach(order => {
+            if (typeof order.for_sale !== "number") {
+                order.for_sale = parseInt(order.for_sale, 10);
+            }
+            
+            order.expiration = new Date(order.expiration);
+            order.expiration = new Date(order.expiration.getTime() - order.expiration.getTimezoneOffset()*60*1000);
+
+            orders = orders.set(
+                order.id,
+                new LimitOrder(order, assets, quoteAsset.get("id"))
+            );
+        });
 
         return {
             bids: orders.filter(a => {
-                return (a.seller === account_id && a.sell_price.quote.asset_id === quoteAsset.get("id"));
-            }).sort((a, b) => {
-                let {price: a_price} = market_utils.parseOrder(a, baseAsset, quoteAsset);
-                let {price: b_price} = market_utils.parseOrder(b, baseAsset, quoteAsset);
-
-                return b_price.full - a_price.full;
-            }).map(order => {
-                let { value, price, amount } = market_utils.parseOrder(order, baseAsset, quoteAsset);
-
-                return {
-                    id: order.id,
-                    value,
-                    price: price.full,
-                    amount, 
-                    expiration: new Date(order.expiration.getTime() - order.expiration.getTimezoneOffset()*60*1000)
-                };
-            }).toArray(),
-
+                    return (a.seller === account_id && a.isBid());
+                }).sort((a, b) => {
+                    return b.getPrice() - a.getPrice();
+                }).map(order => {
+                     let { amount, value, price }  = market_utils.parseOrder(order, baseAsset, quoteAsset)
+                    return { 
+                        id: order.id,
+                        amount, 
+                        value, 
+                        price: price.full, 
+                        expiration: order.expiration
+                    };
+                }).toArray(),
             asks: orders.filter(a => {
-                return (a.seller === account_id && a.sell_price.quote.asset_id === baseAsset.get("id"));
-            }).sort((a, b) => {
-                let {price: a_price} = market_utils.parseOrder(a, baseAsset, quoteAsset);
-                let {price: b_price} = market_utils.parseOrder(b, baseAsset, quoteAsset);
+                    return (a.seller === account_id && !a.isBid());
+                }).sort((a, b) => {
+                    return a.getPrice() - b.getPrice();
+                }).map(order => {
+                    let {amount, value, price }  = market_utils.parseOrder(order, baseAsset, quoteAsset);
+                    return { 
+                        id: order.id,
+                        amount, 
+                        value, 
+                        price: price.full, 
+                        expiration: order.expiration
+                    };
+                }).toArray()
+        };
 
-                return a_price.full - b_price.full;
-            }).map(order => {
-                let { value, price, amount } = market_utils.parseOrder(order, baseAsset, quoteAsset);
+        // let orders = MarketsStore.getState().marketLimitOrders;
+        // let account_id = this.account.get("id");
+
+        // return {
+        //     bids: orders.filter(a => {
+        //         return (a.seller === account_id && a.sell_price.quote.asset_id === quoteAsset.get("id"));
+        //     }).sort((a, b) => {
+        //         let {price: a_price} = market_utils.parseOrder(a, baseAsset, quoteAsset);
+        //         let {price: b_price} = market_utils.parseOrder(b, baseAsset, quoteAsset);
+
+        //         return b_price.full - a_price.full;
+        //     }).map(order => {
+        //         let { value, price, amount } = market_utils.parseOrder(order, baseAsset, quoteAsset);
+
+        //         return {
+        //             id: order.id,
+        //             value,
+        //             price: price.full,
+        //             amount, 
+        //             expiration: new Date(order.expiration.getTime() - order.expiration.getTimezoneOffset()*60*1000)
+        //         };
+        //     }).toArray(),
+
+        //     asks: orders.filter(a => {
+        //         return (a.seller === account_id && a.sell_price.quote.asset_id === baseAsset.get("id"));
+        //     }).sort((a, b) => {
+        //         let {price: a_price} = market_utils.parseOrder(a, baseAsset, quoteAsset);
+        //         let {price: b_price} = market_utils.parseOrder(b, baseAsset, quoteAsset);
+
+        //         return a_price.full - b_price.full;
+        //     }).map(order => {
+        //         let { value, price, amount } = market_utils.parseOrder(order, baseAsset, quoteAsset);
                 
-                return {
-                    id: order.id,
-                    value,
-                    price: price.full,
-                    amount,
-                    expiration: new Date(order.expiration.getTime() - order.expiration.getTimezoneOffset()*60*1000)
-                };
-            }).toArray()
-        }
+        //         return {
+        //             id: order.id,
+        //             value,
+        //             price: price.full,
+        //             amount,
+        //             expiration: new Date(order.expiration.getTime() - order.expiration.getTimezoneOffset()*60*1000)
+        //         };
+        //     }).toArray()
+        // }
 		// let history = await this._getHistory();
 
 		// return history[this.account].limit_orders;
