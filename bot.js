@@ -10,8 +10,10 @@ let schedule = require('node-schedule');
 // ASK - ордер на продажу
 
 class Bot {
-	constructor(account, amount, asset, currency, balance) {
-		this.amount = amount;
+	constructor(balance, account, asset, maxAssetAmount, currency, maxCurrencyAmount) {
+		this.maxAssetAmount = maxAssetAmount;
+		this.maxCurrencyAmount = maxCurrencyAmount;
+		this.amount = maxAssetAmount * 0.1;
 		this.account = account;
 		this.asset = asset;
 		this.currency = currency;
@@ -69,6 +71,8 @@ class Bot {
 		oldExpirationDate.setFullYear((oldExpirationDate.getFullYear() + 5));
 		oldExpirationDate.setHours((oldExpirationDate.getHours() - 1));
 
+		let portfollio = await this.accountManager.getPortfollio();
+
 		// Проверяем ордеры на актуальность
 		for(var i = 0; i < openedOrders.bids.length; i++) {
 			let order = openedOrders.bids[i];
@@ -80,8 +84,12 @@ class Bot {
 		};
 
 		if(openedOrders.bids.length == 0) {
-			logger.info(`Покупаем. Количество ${this.amount} цена ${bestBid}`);
-			await this.accountManager.buy(this.amount, bestBid);	
+			if(this.checkMaxAssetAmount(this.asset, this.amount, portfollio)) {
+				logger.info(`Покупаем. Количество ${this.amount} цена ${bestBid}`);
+				await this.accountManager.buy(this.amount, bestBid);	
+			}
+			else
+				logger.info(`Мы уже достигли максимального объема по ${this.asset}`);
 		}
 		else
 			logger.info("Мы уже имеем открытую позицию на покупку.");
@@ -97,8 +105,12 @@ class Bot {
 		};
 
 		if(openedOrders.asks.length == 0) {
-			logger.info(`Продаем. Количество ${this.amount} цена ${bestAsk}`);	
-			await this.accountManager.sell(this.amount, bestAsk);
+			if(this.checkMaxAssetAmount(this.currency, this.amount * bestAsk, portfollio)) {
+				logger.info(`Продаем. Количество ${this.amount} цена ${bestAsk}`);	
+				await this.accountManager.sell(this.amount, bestAsk);
+			}
+			else
+				logger.info(`Мы уже достигли максимального объема по ${this.currency}`);
 		}
 		else
 			logger.info("Мы уже имеем открытую позицию на продажу.");
@@ -113,6 +125,13 @@ class Bot {
 		setTimeout(this.loop.bind(this), 60*1000);
 	}
 
+	checkMaxAssetAmount(asset, amount, portfollio) {
+		let balance = portfollio.find(x=> x.asset == this.asset);
+		if(balance.amount + amount > this.maxAssetAmount)
+			return false;
+		
+		return true;
+	}
 	
 	isProfitable(bestAsk, bestBid) {
 		

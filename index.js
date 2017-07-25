@@ -20,11 +20,11 @@ initBitshares().then(() => {
 	balance.startShowTotal(toAsset);
 
 	// Bot
-	let btc_usd_bot = new Bot(account, 0.001, "BTC", "USD", balance);
+	let btc_usd_bot = new Bot(balance, account, "BTC", 0.01, "USD", 10);
 	btc_usd_bot.run();
 
 	setTimeout(() => {
-		let bts_cny_bot = new Bot(account, 4, "BTS", "CNY", balance);
+		let bts_cny_bot = new Bot(balance, account, "BTS", 40, "CNY", 40);
 		bts_cny_bot.run();
 	}, 30 * 1000);
 });
